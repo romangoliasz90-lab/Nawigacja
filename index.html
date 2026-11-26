@@ -28,6 +28,19 @@ details{font-size:13px;color:#5f6368;margin-top:8px}details .row{margin:6px 0}de
 .li span{flex:1}.li em{font-style:normal;color:#5f6368;white-space:nowrap}
 .li.v i{background:#188038}.li.v{color:#80868b}.li.c{background:#fce8e6;font-weight:700}.li.c i{background:#d93025}
 input[type=file]{display:none}
+.pill{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 125px);z-index:1000;background:#fff;border:0;border-radius:24px;padding:11px 16px;font-weight:700;font-size:14px;box-shadow:0 1px 6px #0006;color:#1a73e8}
+#adm{position:absolute;left:0;right:0;bottom:0;height:52vh;z-index:1500;background:#fff;display:none;flex-direction:column;border-radius:18px 18px 0 0;box-shadow:0 -2px 14px #0005}
+#ah{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid #dadce0}#as{flex:1;font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ab{overflow:auto;flex:1;padding:8px 14px}
+.adm #bot,.adm #ban,.adm #fabs,.adm #bAdm{display:none}.adm #adm{display:flex}
+@media(min-width:900px){#adm{left:auto;top:0;width:430px;height:100%;border-radius:0}}
+#ab input[type=text],#ab input[type=password]{width:100%;padding:9px;margin:4px 0;font-size:15px;border:1px solid #dadce0;border-radius:8px}
+.er{display:flex;gap:6px;align-items:center;padding:7px 4px;border-bottom:1px solid #f1f3f4;font-size:13px}.er.s{background:#e8f0fe}
+.er i{font-style:normal;width:28px;text-align:center;font-weight:700}.er span{flex:1}.er em{font-style:normal;color:#5f6368;white-space:nowrap}
+.er b{cursor:pointer;padding:6px 8px;background:#f1f3f4;border-radius:8px}
+.ty{border:0;border-radius:10px;padding:4px 8px;font-size:11px;font-weight:700;color:#fff;background:#80868b}.ty.w{background:#d93025}
+.tb{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tb .btn{flex:none;padding:9px 12px;font-size:13px}
+.pin.s{background:#1a73e8}
 </style></head><body>
 <div id="map"></div>
 <div id="ban"><svg id="ar" viewBox="0 0 24 24"><path d="M12 2l8 9h-5.5v11h-5V11H4z"/></svg><div><div id="bd">—</div><div id="bt"></div><div id="bs"></div></div></div>
@@ -36,14 +49,9 @@ input[type=file]{display:none}
 <div id="bot">
  <div id="nm"></div><div id="eta">Brak trasy</div><div id="st"></div>
  <div class="row"><button class="btn p" id="bStart">▶ Start</button><button class="btn" id="bTrasy">📑 Trasy</button><button class="btn" id="bFind">Znajdź</button><button class="btn" id="bReset">Reset</button></div>
- <details><summary>Narzędzia dyspozytora</summary>
-  <input type="text" id="rn" placeholder="nazwa trasy (taka trafi do bazy)">
-  <div class="row"><input type="text" id="em" placeholder="e-mail dyspozytora" autocomplete="username"><input type="password" id="pw" placeholder="hasło" autocomplete="current-password"></div>
-  <div class="row"><button class="btn" id="bLogin">🔑 Zaloguj</button><label class="btn">📂 KMZ<input id="file" type="file" accept=".kmz,.kml"></label></div>
-  <div class="row"><button class="btn" id="bRoute">🧭 Wyznacz</button><button class="btn" id="bSave">☁ Zapisz do bazy</button><button class="btn" id="bDel">🗑 Usuń</button></div>
-  <input type="text" id="srv" value="https://router.project-osrm.org">
- </details>
 </div>
+<button id="bAdm" class="pill">🔐 Dyspozytor</button>
+<div id="adm"><div id="ah"><b id="at">Panel dyspozytora</b><span id="as"></span><button class="btn" style="flex:none;padding:8px 14px" id="aX">✕</button></div><div id="ab"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -52,7 +60,7 @@ const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return 
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const fmt=m=>m>=1000?(m/1000).toFixed(1).replace('.',',')+' km':(m>100?Math.round(m/10)*10:Math.round(m))+' m';
-const st=t=>$('st').textContent=t;
+const st=t=>{$('st').textContent=t;$('as').textContent=t};
 const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([49.82,19.05],11);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 const cas=L.polyline([],{color:'#fff',weight:13,opacity:.95}).addTo(map);
@@ -70,12 +78,12 @@ let token=null;
 async function sb(path,opt={}){
  const h={apikey:SB_KEY,'Content-Type':'application/json',...(opt.headers||{})};if(token)h.Authorization='Bearer '+token;
  const r=await fetch(SB_URL+'/rest/v1/'+path,{...opt,headers:h});
- if(!r.ok)throw Error(r.status===401||r.status===403?'brak uprawnień (zaloguj się ponownie)':(await r.text()).slice(0,160));
+ if(!r.ok){const tx=(await r.text()).slice(0,200);throw Error((r.status===401||r.status===403?'brak uprawnień ['+r.status+'] ':'')+tx)}
  return r.status===204?null:r.json();
 }
 async function login(){
  try{const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('em').value.trim(),password:$('pw').value})});
-  const d=await r.json();if(!r.ok)return st('Logowanie nieudane');token=d.access_token;st('Zalogowano jako dyspozytor (sesja ok. 1 godz.)')}
+  const d=await r.json();if(!r.ok)return st('Logowanie nieudane');token=d.access_token;st('Zalogowano jako dyspozytor');ED?edRender():viewList()}
  catch(e){st('Błąd logowania: '+e.message)}
 }
 async function showSel(){
@@ -187,7 +195,7 @@ function stepTxt(m){const t=m.type,mo=MOD[m.modifier]||'',side=/left/.test(m.mod
 /* ---------- routing (kolejność punktów zachowana) ---------- */
 async function buildRoute(){
  if(stops.length<2)return st('Najpierw wczytaj trasę z min. 2 punktami');
- const base=$('srv').value.replace(/\/$/,'');ls.set('srv',base);
+ const base=osrmBase;
  const CH=24,total=Math.ceil((stops.length-1)/CH),pts=[],idx=[0],steps=[];let dur=0,ps=0;
  for(let k=0;k<total;k++){
   st(`Wyznaczanie trasy: odcinek ${k+1}/${total}…`);
@@ -318,20 +326,120 @@ function render(fit){
  if(fit)map.fitBounds(cas.getBounds(),{padding:[60,60]});
 }
 
+/* ---------- panel dyspozytora ---------- */
+const TL={w:'Odśnieżanie',t:'Przejazd bez pracy',d:'Dojazd / powrót'};
+let ED=null,osrmBase=ls.get('srv')||'https://router.project-osrm.org';
+const edL=L.layerGroup(),A=$('ab');
+const clen=co=>{let x=0;for(let i=1;i<co.length;i++)x+=hav(co[i-1],co[i]);return x};
+const S_=s=>s.co[0],E_=s=>s.co[s.co.length-1];
+function openAdm(){document.body.classList.add('adm');token?viewList():viewLogin()}
+function closeAdm(){if(ED&&ED.dirty&&!confirm('Porzucić niezapisane zmiany?'))return;leaveEdit();document.body.classList.remove('adm')}
+function viewLogin(){$('at').textContent='Panel dyspozytora';A.innerHTML='<p>Zaloguj się kontem dyspozytora:</p><input type="text" id="em" placeholder="e-mail" autocomplete="username"><input type="password" id="pw" placeholder="hasło" autocomplete="current-password"><div class="tb"><button class="btn p" data-a="login">🔑 Zaloguj</button></div>'}
+async function viewList(){
+ leaveEdit();$('at').textContent='Trasy w bazie';A.textContent='Ładowanie…';
+ try{const rows=await sb('routes?select=name,points,km&order=name');
+  A.innerHTML=(rows.length?rows.map(r=>`<div class="er"><span><strong>${esc(r.name)}</strong><br><small>${r.points} kroków · ${String(r.km).replace('.',',')} km</small></span><b data-a="edit" data-n="${esc(r.name)}">✏️ Edytuj</b><b data-a="del" data-n="${esc(r.name)}">🗑</b></div>`).join(''):'<p>Brak tras w bazie.</p>')+
+  `<div class="tb"><label class="btn p">📂 Nowa trasa z KMZ<input id="file" type="file" accept=".kmz,.kml"></label><button class="btn" data-a="out">Wyloguj</button></div><small>Serwer routingu (łączenie i dodawanie odcinków):</small><input type="text" id="srv" value="${esc(osrmBase)}">`;
+ }catch(e){if(/\[40[13]\]/.test(e.message)){token=null;viewLogin();st('Sesja wygasła – zaloguj się ponownie')}else A.textContent='Błąd bazy: '+e.message}
+}
+async function newFromFile(f){
+ if(!f)return;
+ try{const r=await readFile(f);if(!r.lines.length)return st('Plik nie zawiera odcinków (LineString) – nie da się go edytować');
+  enterEdit(r.name||'Nowa trasa',r.lines.slice().sort((a,b)=>a.n-b.n).map(l=>({t:/odśn/i.test(l.type)?'w':/dojazd/i.test(l.type)?'d':'t',type:l.type,street:l.street,co:l.co})),null,true)}
+ catch(e){st('Błąd pliku: '+e.message)}
+}
+async function editRoute(name){
+ st('Pobieranie trasy…');
+ try{const r=(await sb('routes?select=route&name=eq.'+encodeURIComponent(name)))[0].route;
+  if(!r.seg)return st('Tej trasy nie można edytować (brak odcinków)');
+  enterEdit(name,r.seg.map((g,k)=>({t:g.t,type:g.type,street:g.street,co:r.pts.slice(r.idx[k],r.idx[k+1]+1)})),name,false);st('')}
+ catch(e){st('Błąd: '+e.message)}
+}
+function enterEdit(name,segs,orig,dirty){
+ [cas,done_,todo,todoT].forEach(l=>l.remove());markers.forEach(m=>m.remove());markers=[];
+ ED={name,segs,orig,sel:-1,undo:[],add:false,dirty};edL.addTo(map);edDraw();
+ map.fitBounds(L.polyline(segs.flatMap(s=>s.co)).getBounds(),{padding:[40,40]});edRender();
+}
+function leaveEdit(){
+ if(!ED)return;ED=null;edL.clearLayers();map.removeLayer(edL);[cas,done_,todo,todoT].forEach(l=>l.addTo(map));
+ if(route){drawStops(false);render(true)}
+}
+function edDraw(){
+ edL.clearLayers();
+ ED.segs.forEach((s,i)=>{const w=s.t==='w',on=i===ED.sel;
+  L.polyline(s.co,{color:on?'#1a73e8':w?'#d93025':'#80868b',weight:on?9:w?6:3,dashArray:w||on?null:'2 8',interactive:false}).addTo(edL);
+  L.marker(S_(s),{icon:L.divIcon({className:'',html:`<div class="pin${on?' s':''}">${i+1}</div>`,iconSize:[22,22]})}).on('click',()=>edSel(i)).addTo(edL)});
+}
+function edSel(i){ED.sel=i;edDraw();map.fitBounds(L.polyline(ED.segs[i].co).getBounds(),{padding:[50,50],maxZoom:17});edRender(true)}
+function edRender(sc){
+ $('at').textContent='Edycja trasy';
+ const tot=ED.segs.reduce((a,s)=>a+clen(s.co),0);
+ A.innerHTML=(token?'':'<div class="tb"><input type="text" id="em" placeholder="e-mail"><input type="password" id="pw" placeholder="hasło"><button class="btn p" data-a="login">🔑 Zaloguj ponownie</button></div>')+
+ `<input type="text" id="en" value="${esc(ED.name)}" placeholder="Nazwa trasy"><div class="tb"><button class="btn p" data-a="save">💾 Zapisz</button><button class="btn" data-a="undo">↶ Cofnij</button><button class="btn${ED.add?' p':''}" data-a="add">➕ Dodaj krok ${ED.sel>=0?'po #'+(ED.sel+1):'na końcu'}</button><button class="btn" data-a="back">← Lista tras</button></div><small>${ED.segs.length} kroków · ${fmt(tot)}${ED.add?' · <b>kliknij miejsce na mapie</b>':''}</small>`+
+ ED.segs.map((s,i)=>`<div class="er${i===ED.sel?' s':''}" data-i="${i}"><i>${i+1}</i><button class="ty ${s.t}" data-a="tog" data-i="${i}">${s.t==='w'?'Odśn.':s.t==='d'?'Dojazd':'Przejazd'}</button><span>${esc(s.street)}${s.auto?' <small>(auto)</small>':''}</span><em>${fmt(clen(s.co))}</em><b data-a="up" data-i="${i}">↑</b><b data-a="dn" data-i="${i}">↓</b><b data-a="rm" data-i="${i}">🗑</b></div>`).join('');
+ if(sc){const e=A.querySelector('.er.s');if(e)e.scrollIntoView({block:'nearest'})}
+}
+async function osrm(a,b){
+ const url=`${osrmBase.replace(/\/$/,'')}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson&steps=true`;
+ for(let t=0;t<3;t++){
+  try{const d=await(await fetch(url)).json();
+   if(d.code==='Ok'){const r=d.routes[0],s=r.legs[0].steps.slice().sort((x,y)=>y.distance-x.distance)[0];
+    return{co:r.geometry.coordinates.map(c=>[c[1],c[0]]),street:(s&&s.name)||'połączenie'}}}catch(e){}
+  await sleep(1200);
+ }
+ throw Error('serwer routingu nie odpowiada');
+}
+async function conn(a,b){const r=await osrm(a,b);return{t:'t',type:TL.t,street:r.street,co:r.co,auto:true}}
+async function fixGaps(){ /* dokleja przejazdy tam, gdzie odcinki się nie stykają; trasa ma być pętlą */
+ const keep=ED.segs[ED.sel],S=ED.segs.filter(s=>!s.auto),out=[];
+ for(const s of S){const p=out[out.length-1];if(p&&hav(E_(p),S_(s))>8)out.push(await conn(E_(p),S_(s)));out.push(s)}
+ if(out.length&&hav(E_(out[out.length-1]),S_(out[0]))>8)out.push(await conn(E_(out[out.length-1]),S_(out[0])));
+ ED.segs=out;ED.sel=keep?out.indexOf(keep):-1;
+}
+async function edDo(fn){
+ ED.undo.push(JSON.stringify(ED.segs));if(ED.undo.length>15)ED.undo.shift();
+ try{await fn();st('Łączenie odcinków…');await fixGaps();ED.dirty=true;st('')}
+ catch(e){ED.segs=JSON.parse(ED.undo.pop());ED.sel=-1;st('Błąd: '+e.message)}
+ edDraw();edRender(true);
+}
+async function edSave(){
+ ED.name=(ED.name||'').trim();const nm=ED.name;
+ if(!nm)return st('Podaj nazwę trasy');if(!token)return st('Sesja wygasła – zaloguj się ponownie (zmiany zostają)');
+ try{
+  const d=fromLines(ED.segs.map((s,i)=>({n:i+1,type:s.type,street:s.street,co:s.co}))),rt=d.route,R=x=>Math.round(x*1e6)/1e6;
+  let km=0;for(let i=1;i<rt.pts.length;i++)km+=hav(rt.pts[i-1],rt.pts[i]);rt.pts=rt.pts.map(p=>[R(p[0]),R(p[1])]);
+  await sb('routes?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:nm,points:rt.seg.length,km:Math.round(km/100)/10,stops:d.stops,route:rt,updated_at:new Date().toISOString()})});
+  if(ED.orig&&ED.orig!==nm&&confirm(`Zmieniono nazwę. Usunąć starą trasę „${ED.orig}”?`))await sb('routes?name=eq.'+encodeURIComponent(ED.orig),{method:'DELETE'});
+  ED.orig=nm;ED.dirty=false;st('Zapisano w bazie: '+nm);
+ }catch(e){if(/\[401\]/.test(e.message)){token=null;edRender()}st('Błąd zapisu: '+e.message)}
+}
+async function act(a,d){
+ const i=+d.i;
+ if(a==='login')return login();
+ if(a==='out'){token=null;viewLogin();return st('Wylogowano')}
+ if(a==='edit')return editRoute(d.n);
+ if(a==='del'){if(confirm('Usunąć trasę '+d.n+' z bazy?')){try{await sb('routes?name=eq.'+encodeURIComponent(d.n),{method:'DELETE'});st('Usunięto: '+d.n)}catch(e){st('Błąd: '+e.message)}viewList()}return}
+ if(!ED)return;
+ if(a==='tog')return edDo(()=>{const s=ED.segs[i];s.t=s.t==='w'?'t':'w';s.type=TL[s.t];delete s.auto});
+ if(a==='up'&&i>0)return edDo(()=>{[ED.segs[i-1],ED.segs[i]]=[ED.segs[i],ED.segs[i-1]];ED.sel=i-1});
+ if(a==='dn'&&i<ED.segs.length-1)return edDo(()=>{[ED.segs[i+1],ED.segs[i]]=[ED.segs[i],ED.segs[i+1]];ED.sel=i+1});
+ if(a==='rm'){if(ED.segs.length<2)return;return edDo(()=>{ED.segs.splice(i,1);ED.sel=-1})}
+ if(a==='undo'){if(!ED.undo.length)return st('Nic do cofnięcia');ED.segs=JSON.parse(ED.undo.pop());ED.sel=-1;edDraw();return edRender()}
+ if(a==='add'){ED.add=!ED.add;st(ED.add?'Kliknij na mapie miejsce nowego kroku':'');return edRender()}
+ if(a==='save')return edSave();
+ if(a==='back'){if(ED.dirty&&!confirm('Porzucić niezapisane zmiany?'))return;viewList()}
+}
+function edAdd(ll){
+ const at=ED.sel>=0?ED.sel:ED.segs.length-1;
+ return edDo(async()=>{const r=await osrm(E_(ED.segs[at]),[ll.lat,ll.lng]);ED.segs.splice(at+1,0,{t:'w',type:TL.w,street:r.street,co:r.co});ED.sel=at+1});
+}
+$('bAdm').onclick=openAdm;$('aX').onclick=closeAdm;
+A.onclick=e=>{const a=e.target.closest('[data-a]');if(a)return act(a.dataset.a,a.dataset);const r=e.target.closest('.er[data-i]');if(r&&ED)edSel(+r.dataset.i)};
+A.onchange=e=>{if(e.target.id==='srv'){osrmBase=e.target.value.trim().replace(/\/$/,'');ls.set('srv',osrmBase)}else if(e.target.id==='file')newFromFile(e.target.files[0])};
+A.oninput=e=>{if(e.target.id==='en'&&ED){ED.name=e.target.value;ED.dirty=true}};
+map.on('click',e=>{if(ED&&ED.add){ED.add=false;edAdd(e.latlng)}});
+
 /* ---------- zdarzenia ---------- */
-$('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;
- try{const r=await readFile(f);NAME=r.name||f.name.replace(/\.[^.]+$/,'');$('rn').value=NAME;$('nm').textContent='TRASA '+NAME;
-  [cas,todo,todoT,done_].forEach(l=>l.setLatLngs([]));
-  if(r.lines.length){const d=fromLines(r.lines);applyData(d,true);st(`Wczytano ${NAME}: ${r.lines.length} kroków, ${fmt(cum[cum.length-1])}. Zaloguj się (🔑) i zapisz do bazy.`)}
-  else{stops=r.points;route=null;$('ban').style.display='none';drawStops(true);$('eta').textContent=`Wczytano ${stops.length} punktów`;st('Brak odcinków w pliku – naciśnij 🧭 Wyznacz (routing OSRM)')}}
- catch(err){st('Błąd pliku: '+err.message)}};
-$('bRoute').onclick=buildRoute;
-$('bLogin').onclick=login;
-$('bSave').onclick=async()=>{NAME=$('rn').value.trim()||NAME;if(!route||!NAME)return st('Najpierw wczytaj trasę');if(!token)return st('Najpierw zaloguj się (🔑)');
- try{await sb('routes?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:NAME,points:route.seg?route.seg.length:stops.length,km:Math.round(cum[cum.length-1]/100)/10,stops,route,updated_at:new Date().toISOString()})});st('Zapisano w bazie: '+NAME)}
- catch(e){st('Błąd zapisu: '+e.message)}};
-$('bDel').onclick=async()=>{if(!token)return st('Najpierw zaloguj się (🔑)');if(!NAME||!confirm('Usunąć trasę '+NAME+' z bazy?'))return;
- try{await sb('routes?name=eq.'+encodeURIComponent(NAME),{method:'DELETE'});st('Usunięto z bazy: '+NAME)}catch(e){st('Błąd: '+e.message)}};
 $('bTrasy').onclick=showSel;
 $('lb').onclick=e=>{const r=e.target.closest('[data-n]');if(r){$('lst').style.display='none';autoLoad(r.dataset.n)}};
 $('bStart').onclick=()=>{if(!route)return st('Brak trasy');watchId===null?startNav():stopNav()};
@@ -343,7 +451,7 @@ $('bFind').onclick=()=>{if(!navigator.geolocation||!route)return;navigator.geolo
 $('bReset').onclick=()=>{if(route&&confirm('Wyzerować przebytą trasę?')){prog={i:0,t:0};off=0;syncSaid();vcount=-1;render()}};
 map.on('dragstart',()=>follow=false);
 (function(){
- const s=ls.get('srv');if(s)$('srv').value=s;
+ 
  const q=new URLSearchParams(location.search).get('t')||location.hash.slice(1);
  if(q)autoLoad(decodeURIComponent(q).replace(/[<>&`]/g,''));else showSel();
 })();
