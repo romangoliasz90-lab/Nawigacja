@@ -54,7 +54,7 @@ input[type=file]{display:none}
 </div>
 <div id="toast"></div>
 <button id="bAdm" class="pill">🔐 Dyspozytor</button>
-<div id="adm"><div id="ah"><b id="at">Panel dyspozytora</b><span id="as"></span><button class="btn" style="flex:none;padding:8px 14px" id="aX">✕</button></div><div id="ab"></div></div>
+<div id="adm"><div id="ah"><b id="at">Panel dyspozytora</b><small style="color:#9aa0a6">wersja 5</small><span id="as"></span><button class="btn" style="flex:none;padding:8px 14px" id="aX">✕</button></div><div id="ab"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -83,7 +83,7 @@ async function sb(path,opt={}){
  const h={apikey:SB_KEY,'Content-Type':'application/json',...(opt.headers||{})};if(token)h.Authorization='Bearer '+token;
  const r=await fetch(SB_URL+'/rest/v1/'+path,{...opt,headers:h});
  if(!r.ok){const tx=(await r.text()).slice(0,200);throw Error((r.status===401||r.status===403?'brak uprawnień ['+r.status+'] ':'')+tx)}
- return r.status===204?null:r.json();
+ const tx=await r.text();return tx?JSON.parse(tx):null; /* zapis (201) i usuwanie (204) zwracają pustą odpowiedź */
 }
 async function login(){
  try{const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('em').value.trim(),password:$('pw').value})});
