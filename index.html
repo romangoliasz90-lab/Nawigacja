@@ -54,7 +54,7 @@ input[type=file]{display:none}
 </div>
 <div id="toast"></div>
 <button id="bAdm" class="pill">🔐 Dyspozytor</button>
-<div id="adm"><div id="ah"><b id="at">Panel dyspozytora</b><small style="color:#9aa0a6">wersja 5</small><span id="as"></span><button class="btn" style="flex:none;padding:8px 14px" id="aX">✕</button></div><div id="ab"></div></div>
+<div id="adm"><div id="ah"><b id="at">Panel dyspozytora</b><small style="color:#9aa0a6">wersja 6</small><span id="as"></span><button class="btn" style="flex:none;padding:8px 14px" id="aX">✕</button></div><div id="ab"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -64,7 +64,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const fmt=m=>m>=1000?(m/1000).toFixed(1).replace('.',',')+' km':(m>100?Math.round(m/10)*10:Math.round(m))+' m';
 const st=t=>{$('st').textContent=t;$('as').textContent=t;if(/^(Błąd|Sesja|Logowanie nieudane)/.test(t))toast(t)};
-function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',7000)}
+function toast(t,ok){const e=$('toast');e.textContent=t;e.style.background=ok?'#188038':'#b3261e';e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',7000)}
 const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([49.82,19.05],11);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 const cas=L.polyline([],{color:'#fff',weight:13,opacity:.95}).addTo(map);
@@ -375,6 +375,7 @@ function edDraw(){
   L.marker(S_(s),{icon:L.divIcon({className:'',html:`<div class="pin${on?' s':''}">${i+1}</div>`,iconSize:[22,22]})}).on('click',()=>edSel(i)).addTo(edL)});
  if(ED.segs.length>1)ED.segs.forEach((s,i)=>{const t=ED.segs[(i+1)%ED.segs.length];if(hav(E_(s),S_(t))>8)L.polyline([E_(s),S_(t)],{color:'#f9ab00',weight:3,dashArray:'4 6',interactive:false}).addTo(edL)});
 }
+function svTxt(){return ED.dirty?'<b style="color:#b06000">● niezapisane zmiany</b>':(ED.savedAt?'<b style="color:#188038">✔ zapisano w bazie o '+ED.savedAt+'</b>':'<small>bez zmian względem bazy</small>')}
 function gapRow(i){
  const n=ED.segs.length;if(n<2)return'';
  const g=hav(E_(ED.segs[i]),S_(ED.segs[(i+1)%n]));
@@ -386,7 +387,7 @@ function edRender(sc){
  $('at').textContent='Edycja trasy';
  const tot=ED.segs.reduce((a,s)=>a+clen(s.co),0);
  A.innerHTML=(token?'':'<div class="tb"><input type="text" id="em" placeholder="e-mail"><input type="password" id="pw" placeholder="hasło"><button class="btn p" data-a="login">🔑 Zaloguj ponownie</button></div>')+
- `<input type="text" id="en" value="${esc(ED.name)}" placeholder="Nazwa trasy"><div class="tb"><button class="btn p" data-a="save">💾 Zapisz</button><button class="btn" data-a="undo">↶ Cofnij</button><button class="btn${ED.add?' p':''}" data-a="add">➕ Dodaj krok ${ED.sel>=0?'po #'+(ED.sel+1):'na końcu'}</button><button class="btn" data-a="back">← Lista tras</button></div><small>${ED.segs.length} kroków · ${fmt(tot)}${ED.add?' · <b>kliknij miejsce na mapie</b>':''}</small>`+
+ `<input type="text" id="en" value="${esc(ED.name)}" placeholder="Nazwa trasy"><div class="tb"><button class="btn p" data-a="save">💾 Zapisz</button><button class="btn" data-a="undo">↶ Cofnij</button><button class="btn${ED.add?' p':''}" data-a="add">➕ Dodaj krok ${ED.sel>=0?'po #'+(ED.sel+1):'na końcu'}</button><button class="btn" data-a="back">← Lista tras</button></div><div id="sv">${svTxt()}</div><small>${ED.segs.length} kroków · ${fmt(tot)}${ED.add?' · <b>kliknij miejsce na mapie</b>':''}</small>`+
  ED.segs.map((s,i)=>`<div class="er${i===ED.sel?' s':''}" data-i="${i}"><i>${i+1}</i><button class="ty ${s.t}" data-a="tog" data-i="${i}">${s.t==='w'?'Odśn.':s.t==='d'?'Dojazd':'Przejazd'}</button><span>${esc(s.street)}${s.auto?(s.co.length===2?' <small>(auto – prosta linia)</small>':' <small>(auto)</small>'):''}</span><em>${fmt(clen(s.co))}</em><b data-a="up" data-i="${i}">↑</b><b data-a="dn" data-i="${i}">↓</b><b data-a="rm" data-i="${i}">🗑</b></div>`+gapRow(i)).join('');
  if(sc){const e=A.querySelector('.er.s');if(e)e.scrollIntoView({block:'nearest'})}
 }
@@ -416,7 +417,11 @@ async function edSave(){
   let km=0;for(let i=1;i<rt.pts.length;i++)km+=hav(rt.pts[i-1],rt.pts[i]);rt.pts=rt.pts.map(p=>[R(p[0]),R(p[1])]);
   await sb('routes?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:nm,points:rt.seg.length,km:Math.round(km/100)/10,stops:d.stops,route:rt,updated_at:new Date().toISOString()})});
   if(ED.orig&&ED.orig!==nm&&confirm(`Zmieniono nazwę. Usunąć starą trasę „${ED.orig}”?`))await sb('routes?name=eq.'+encodeURIComponent(ED.orig),{method:'DELETE'});
-  ED.orig=nm;ED.dirty=false;const g=gaps();st('Zapisano w bazie: '+nm+(g?` – uwaga: przerw w trasie: ${g}`:''));
+  const v=(await sb('routes?select=points,km,updated_at&name=eq.'+encodeURIComponent(nm)))[0];
+  if(!v||v.points!==rt.seg.length)throw Error('zapis nie został potwierdzony przez bazę – spróbuj ponownie');
+  ED.orig=nm;ED.dirty=false;ED.savedAt=new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'});
+  const g=gaps(),m='✔ Zapisano trasę „'+nm+'”: '+v.points+' kroków, '+String(v.km).replace('.',',')+' km'+(g?' (uwaga: przerw w trasie: '+g+')':'');
+  st(m);toast(m,true);edRender();
  }catch(e){if(/\[401\]/.test(e.message)){token=null;edRender()}st('Błąd zapisu: '+e.message)}
 }
 async function act(a,d){
@@ -424,7 +429,7 @@ async function act(a,d){
  if(a==='login')return login();
  if(a==='out'){token=null;viewLogin();return st('Wylogowano')}
  if(a==='edit')return editRoute(d.n);
- if(a==='del'){if(confirm('Usunąć trasę '+d.n+' z bazy?')){try{await sb('routes?name=eq.'+encodeURIComponent(d.n),{method:'DELETE'});st('Usunięto: '+d.n)}catch(e){st('Błąd: '+e.message)}viewList()}return}
+ if(a==='del'){if(confirm('Usunąć trasę '+d.n+' z bazy?')){try{await sb('routes?name=eq.'+encodeURIComponent(d.n),{method:'DELETE'});toast('✔ Usunięto trasę „'+d.n+'”',true)}catch(e){st('Błąd: '+e.message)}viewList()}return}
  if(!ED)return;
  if(a==='tog')return edDo(()=>{const s=ED.segs[i];s.t=s.t==='w'?'t':'w';s.type=TL[s.t];delete s.auto});
  if(a==='up'&&i>0)return edDo(()=>{[ED.segs[i-1],ED.segs[i]]=[ED.segs[i],ED.segs[i-1]];ED.sel=i-1});
@@ -443,7 +448,7 @@ function edAdd(ll){
 $('bAdm').onclick=openAdm;$('aX').onclick=closeAdm;
 A.onclick=e=>{const a=e.target.closest('[data-a]');if(a)return act(a.dataset.a,a.dataset);const r=e.target.closest('.er[data-i]');if(r&&ED)edSel(+r.dataset.i)};
 A.onchange=e=>{if(e.target.id==='srv'){osrmBase=e.target.value.trim().replace(/\/$/,'');ls.set('srv',osrmBase)}else if(e.target.id==='file')newFromFile(e.target.files[0])};
-A.oninput=e=>{if(e.target.id==='en'&&ED){ED.name=e.target.value;ED.dirty=true}};
+A.oninput=e=>{if(e.target.id==='en'&&ED){ED.name=e.target.value;ED.dirty=true;const v=$('sv');if(v)v.innerHTML=svTxt()}};
 map.on('click',e=>{if(ED&&ED.add){ED.add=false;edAdd(e.latlng)}});
 
 /* ---------- zdarzenia ---------- */
