@@ -42,6 +42,7 @@ input[type=file]{display:none}
 .ty{border:0;border-radius:10px;padding:4px 8px;font-size:11px;font-weight:700;color:#fff;background:#80868b}.ty.w{background:#d93025}
 .tb{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tb .btn{flex:none;padding:9px 12px;font-size:13px}
 .pin.s{background:#1a73e8}
+.gap{background:#fef7e0;color:#b06000;padding:6px 8px;font-size:12px;display:flex;gap:8px;align-items:center;justify-content:space-between;border-bottom:1px solid #fde293}.gap b{cursor:pointer;background:#fff;padding:8px 12px;border-radius:8px;font-size:13px}
 </style></head><body>
 <div id="map"></div>
 <div id="ban"><svg id="ar" viewBox="0 0 24 24"><path d="M12 2l8 9h-5.5v11h-5V11H4z"/></svg><div><div id="bd">—</div><div id="bt"></div><div id="bs"></div></div></div>
@@ -372,14 +373,21 @@ function edDraw(){
  ED.segs.forEach((s,i)=>{const w=s.t==='w',on=i===ED.sel;
   L.polyline(s.co,{color:on?'#1a73e8':w?'#d93025':'#80868b',weight:on?9:w?6:3,dashArray:w||on?null:'2 8',interactive:false}).addTo(edL);
   L.marker(S_(s),{icon:L.divIcon({className:'',html:`<div class="pin${on?' s':''}">${i+1}</div>`,iconSize:[22,22]})}).on('click',()=>edSel(i)).addTo(edL)});
+ if(ED.segs.length>1)ED.segs.forEach((s,i)=>{const t=ED.segs[(i+1)%ED.segs.length];if(hav(E_(s),S_(t))>8)L.polyline([E_(s),S_(t)],{color:'#f9ab00',weight:3,dashArray:'4 6',interactive:false}).addTo(edL)});
 }
+function gapRow(i){
+ const n=ED.segs.length;if(n<2)return'';
+ const g=hav(E_(ED.segs[i]),S_(ED.segs[(i+1)%n]));
+ return g>8?`<div class="gap">⚠ ${i===n-1?'przerwa przed startem (zamknięcie pętli)':'przerwa między #'+(i+1)+' i #'+(i+2)} · ${fmt(g)} <b data-a="join" data-i="${i}">🔗 Połącz</b></div>`:'';
+}
+function gaps(){const n=ED.segs.length;let c=0;if(n>1)ED.segs.forEach((s,i)=>{if(hav(E_(s),S_(ED.segs[(i+1)%n]))>8)c++});return c}
 function edSel(i){ED.sel=i;edDraw();map.fitBounds(L.polyline(ED.segs[i].co).getBounds(),{padding:[50,50],maxZoom:17});edRender(true)}
 function edRender(sc){
  $('at').textContent='Edycja trasy';
  const tot=ED.segs.reduce((a,s)=>a+clen(s.co),0);
  A.innerHTML=(token?'':'<div class="tb"><input type="text" id="em" placeholder="e-mail"><input type="password" id="pw" placeholder="hasło"><button class="btn p" data-a="login">🔑 Zaloguj ponownie</button></div>')+
  `<input type="text" id="en" value="${esc(ED.name)}" placeholder="Nazwa trasy"><div class="tb"><button class="btn p" data-a="save">💾 Zapisz</button><button class="btn" data-a="undo">↶ Cofnij</button><button class="btn${ED.add?' p':''}" data-a="add">➕ Dodaj krok ${ED.sel>=0?'po #'+(ED.sel+1):'na końcu'}</button><button class="btn" data-a="back">← Lista tras</button></div><small>${ED.segs.length} kroków · ${fmt(tot)}${ED.add?' · <b>kliknij miejsce na mapie</b>':''}</small>`+
- ED.segs.map((s,i)=>`<div class="er${i===ED.sel?' s':''}" data-i="${i}"><i>${i+1}</i><button class="ty ${s.t}" data-a="tog" data-i="${i}">${s.t==='w'?'Odśn.':s.t==='d'?'Dojazd':'Przejazd'}</button><span>${esc(s.street)}${s.auto?(s.co.length===2?' <small>(auto – prosta linia)</small>':' <small>(auto)</small>'):''}</span><em>${fmt(clen(s.co))}</em><b data-a="up" data-i="${i}">↑</b><b data-a="dn" data-i="${i}">↓</b><b data-a="rm" data-i="${i}">🗑</b></div>`).join('');
+ ED.segs.map((s,i)=>`<div class="er${i===ED.sel?' s':''}" data-i="${i}"><i>${i+1}</i><button class="ty ${s.t}" data-a="tog" data-i="${i}">${s.t==='w'?'Odśn.':s.t==='d'?'Dojazd':'Przejazd'}</button><span>${esc(s.street)}${s.auto?(s.co.length===2?' <small>(auto – prosta linia)</small>':' <small>(auto)</small>'):''}</span><em>${fmt(clen(s.co))}</em><b data-a="up" data-i="${i}">↑</b><b data-a="dn" data-i="${i}">↓</b><b data-a="rm" data-i="${i}">🗑</b></div>`+gapRow(i)).join('');
  if(sc){const e=A.querySelector('.er.s');if(e)e.scrollIntoView({block:'nearest'})}
 }
 let STR=0;
@@ -393,16 +401,10 @@ async function osrm(a,b){
  }
  STR++;return{co:[a,b],street:'odcinek prosty (sprawdź)'}; /* routing niedostępny: edycja nie jest blokowana */
 }
-async function conn(a,b){const r=await osrm(a,b);return{t:'t',type:TL.t,street:r.street,co:r.co,auto:true}}
-async function fixGaps(){ /* dokleja przejazdy tam, gdzie odcinki się nie stykają; trasa ma być pętlą */
- const keep=ED.segs[ED.sel],S=ED.segs.filter(s=>!s.auto),out=[];
- for(const s of S){const p=out[out.length-1];if(p&&hav(E_(p),S_(s))>8)out.push(await conn(E_(p),S_(s)));out.push(s)}
- if(out.length&&hav(E_(out[out.length-1]),S_(out[0]))>8)out.push(await conn(E_(out[out.length-1]),S_(out[0])));
- ED.segs=out;ED.sel=keep?out.indexOf(keep):-1;
-}
+async function conn(a,b){const r=await osrm(a,b);return{t:'t',type:TL.t,street:r.street,co:r.co}}
 async function edDo(fn){
  ED.undo.push(JSON.stringify(ED.segs));if(ED.undo.length>15)ED.undo.shift();
- try{STR=0;await fn();st('Łączenie odcinków…');await fixGaps();ED.dirty=true;st('');if(STR)toast('Serwer routingu nie odpowiada – połączenia dodano jako proste linie (oznaczone „auto”). Sprawdź je na mapie.')}
+ try{STR=0;await fn();ED.dirty=true;st('');if(STR)toast('Serwer routingu nie odpowiada – krok dodano jako prostą linię. Sprawdź go na mapie.')}
  catch(e){ED.segs=JSON.parse(ED.undo.pop());ED.sel=-1;st('Błąd: '+e.message)}
  edDraw();edRender(true);
 }
@@ -414,7 +416,7 @@ async function edSave(){
   let km=0;for(let i=1;i<rt.pts.length;i++)km+=hav(rt.pts[i-1],rt.pts[i]);rt.pts=rt.pts.map(p=>[R(p[0]),R(p[1])]);
   await sb('routes?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({name:nm,points:rt.seg.length,km:Math.round(km/100)/10,stops:d.stops,route:rt,updated_at:new Date().toISOString()})});
   if(ED.orig&&ED.orig!==nm&&confirm(`Zmieniono nazwę. Usunąć starą trasę „${ED.orig}”?`))await sb('routes?name=eq.'+encodeURIComponent(ED.orig),{method:'DELETE'});
-  ED.orig=nm;ED.dirty=false;st('Zapisano w bazie: '+nm);
+  ED.orig=nm;ED.dirty=false;const g=gaps();st('Zapisano w bazie: '+nm+(g?` – uwaga: przerw w trasie: ${g}`:''));
  }catch(e){if(/\[401\]/.test(e.message)){token=null;edRender()}st('Błąd zapisu: '+e.message)}
 }
 async function act(a,d){
@@ -428,6 +430,7 @@ async function act(a,d){
  if(a==='up'&&i>0)return edDo(()=>{[ED.segs[i-1],ED.segs[i]]=[ED.segs[i],ED.segs[i-1]];ED.sel=i-1});
  if(a==='dn'&&i<ED.segs.length-1)return edDo(()=>{[ED.segs[i+1],ED.segs[i]]=[ED.segs[i],ED.segs[i+1]];ED.sel=i+1});
  if(a==='rm'){if(ED.segs.length<2)return;return edDo(()=>{ED.segs.splice(i,1);ED.sel=-1})}
+ if(a==='join')return edDo(async()=>{const n=ED.segs.length,c=await conn(E_(ED.segs[i]),S_(ED.segs[(i+1)%n]));ED.segs.splice(i+1,0,c);ED.sel=i+1});
  if(a==='undo'){if(!ED.undo.length)return st('Nic do cofnięcia');ED.segs=JSON.parse(ED.undo.pop());ED.sel=-1;edDraw();return edRender()}
  if(a==='add'){ED.add=!ED.add;st(ED.add?'Kliknij na mapie miejsce nowego kroku':'');return edRender()}
  if(a==='save')return edSave();
