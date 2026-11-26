@@ -37,7 +37,8 @@ input[type=file]{display:none}
 #ab input[type=text],#ab input[type=password]{width:100%;padding:9px;margin:4px 0;font-size:15px;border:1px solid #dadce0;border-radius:8px}
 .er{display:flex;gap:6px;align-items:center;padding:7px 4px;border-bottom:1px solid #f1f3f4;font-size:13px}.er.s{background:#e8f0fe}
 .er i{font-style:normal;width:28px;text-align:center;font-weight:700}.er span{flex:1}.er em{font-style:normal;color:#5f6368;white-space:nowrap}
-.er b{cursor:pointer;padding:6px 8px;background:#f1f3f4;border-radius:8px}
+.er b{cursor:pointer;padding:9px 12px;font-size:16px;background:#f1f3f4;border-radius:8px}
+#toast{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:3000;background:#b3261e;color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;display:none;box-shadow:0 2px 10px #0006}
 .ty{border:0;border-radius:10px;padding:4px 8px;font-size:11px;font-weight:700;color:#fff;background:#80868b}.ty.w{background:#d93025}
 .tb{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tb .btn{flex:none;padding:9px 12px;font-size:13px}
 .pin.s{background:#1a73e8}
@@ -50,6 +51,7 @@ input[type=file]{display:none}
  <div id="nm"></div><div id="eta">Brak trasy</div><div id="st"></div>
  <div class="row"><button class="btn p" id="bStart">▶ Start</button><button class="btn" id="bTrasy">📑 Trasy</button><button class="btn" id="bFind">Znajdź</button><button class="btn" id="bReset">Reset</button></div>
 </div>
+<div id="toast"></div>
 <button id="bAdm" class="pill">🔐 Dyspozytor</button>
 <div id="adm"><div id="ah"><b id="at">Panel dyspozytora</b><span id="as"></span><button class="btn" style="flex:none;padding:8px 14px" id="aX">✕</button></div><div id="ab"></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -60,7 +62,8 @@ const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return 
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const fmt=m=>m>=1000?(m/1000).toFixed(1).replace('.',',')+' km':(m>100?Math.round(m/10)*10:Math.round(m))+' m';
-const st=t=>{$('st').textContent=t;$('as').textContent=t};
+const st=t=>{$('st').textContent=t;$('as').textContent=t;if(/^(Błąd|Sesja|Logowanie nieudane)/.test(t))toast(t)};
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',7000)}
 const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([49.82,19.05],11);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 const cas=L.polyline([],{color:'#fff',weight:13,opacity:.95}).addTo(map);
@@ -376,18 +379,19 @@ function edRender(sc){
  const tot=ED.segs.reduce((a,s)=>a+clen(s.co),0);
  A.innerHTML=(token?'':'<div class="tb"><input type="text" id="em" placeholder="e-mail"><input type="password" id="pw" placeholder="hasło"><button class="btn p" data-a="login">🔑 Zaloguj ponownie</button></div>')+
  `<input type="text" id="en" value="${esc(ED.name)}" placeholder="Nazwa trasy"><div class="tb"><button class="btn p" data-a="save">💾 Zapisz</button><button class="btn" data-a="undo">↶ Cofnij</button><button class="btn${ED.add?' p':''}" data-a="add">➕ Dodaj krok ${ED.sel>=0?'po #'+(ED.sel+1):'na końcu'}</button><button class="btn" data-a="back">← Lista tras</button></div><small>${ED.segs.length} kroków · ${fmt(tot)}${ED.add?' · <b>kliknij miejsce na mapie</b>':''}</small>`+
- ED.segs.map((s,i)=>`<div class="er${i===ED.sel?' s':''}" data-i="${i}"><i>${i+1}</i><button class="ty ${s.t}" data-a="tog" data-i="${i}">${s.t==='w'?'Odśn.':s.t==='d'?'Dojazd':'Przejazd'}</button><span>${esc(s.street)}${s.auto?' <small>(auto)</small>':''}</span><em>${fmt(clen(s.co))}</em><b data-a="up" data-i="${i}">↑</b><b data-a="dn" data-i="${i}">↓</b><b data-a="rm" data-i="${i}">🗑</b></div>`).join('');
+ ED.segs.map((s,i)=>`<div class="er${i===ED.sel?' s':''}" data-i="${i}"><i>${i+1}</i><button class="ty ${s.t}" data-a="tog" data-i="${i}">${s.t==='w'?'Odśn.':s.t==='d'?'Dojazd':'Przejazd'}</button><span>${esc(s.street)}${s.auto?(s.co.length===2?' <small>(auto – prosta linia)</small>':' <small>(auto)</small>'):''}</span><em>${fmt(clen(s.co))}</em><b data-a="up" data-i="${i}">↑</b><b data-a="dn" data-i="${i}">↓</b><b data-a="rm" data-i="${i}">🗑</b></div>`).join('');
  if(sc){const e=A.querySelector('.er.s');if(e)e.scrollIntoView({block:'nearest'})}
 }
+let STR=0;
 async function osrm(a,b){
  const url=`${osrmBase.replace(/\/$/,'')}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson&steps=true`;
- for(let t=0;t<3;t++){
-  try{const d=await(await fetch(url)).json();
+ for(let t=0;t<2;t++){
+  try{const c=new AbortController(),tm=setTimeout(()=>c.abort(),7000);const d=await(await fetch(url,{signal:c.signal})).json();clearTimeout(tm);
    if(d.code==='Ok'){const r=d.routes[0],s=r.legs[0].steps.slice().sort((x,y)=>y.distance-x.distance)[0];
     return{co:r.geometry.coordinates.map(c=>[c[1],c[0]]),street:(s&&s.name)||'połączenie'}}}catch(e){}
-  await sleep(1200);
+  await sleep(500);
  }
- throw Error('serwer routingu nie odpowiada');
+ STR++;return{co:[a,b],street:'odcinek prosty (sprawdź)'}; /* routing niedostępny: edycja nie jest blokowana */
 }
 async function conn(a,b){const r=await osrm(a,b);return{t:'t',type:TL.t,street:r.street,co:r.co,auto:true}}
 async function fixGaps(){ /* dokleja przejazdy tam, gdzie odcinki się nie stykają; trasa ma być pętlą */
@@ -398,7 +402,7 @@ async function fixGaps(){ /* dokleja przejazdy tam, gdzie odcinki się nie styka
 }
 async function edDo(fn){
  ED.undo.push(JSON.stringify(ED.segs));if(ED.undo.length>15)ED.undo.shift();
- try{await fn();st('Łączenie odcinków…');await fixGaps();ED.dirty=true;st('')}
+ try{STR=0;await fn();st('Łączenie odcinków…');await fixGaps();ED.dirty=true;st('');if(STR)toast('Serwer routingu nie odpowiada – połączenia dodano jako proste linie (oznaczone „auto”). Sprawdź je na mapie.')}
  catch(e){ED.segs=JSON.parse(ED.undo.pop());ED.sel=-1;st('Błąd: '+e.message)}
  edDraw();edRender(true);
 }
